@@ -1,6 +1,4 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../components/admin/AdminLayout';
 import AdminLogin from '../components/admin/AdminLogin';
 import { useAdminAuth } from '../components/admin/useAdminAuth';
@@ -13,6 +11,42 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
+
+// Local storage key
+const TESTIMONIALS_STORAGE_KEY = 'ignis_testimonials';
+
+const defaultTestimonials = [
+  {
+    id: '1',
+    author: 'Anna i Piotr',
+    content: 'Dziękujemy całemu zespołowi Ignis Events za niesamowite wesele! Profesjonalizm, kreatywność i zaangażowanie przeszły nasze oczekiwania. Każdy detal był dopracowany, a my mogliśmy cieszyć się tym wyjątkowym dniem bez stresu.',
+    rating: 5,
+    event_type: 'Wesele',
+    avatar: '',
+    featured: true,
+    created_date: '2024-01-15'
+  },
+  {
+    id: '2',
+    author: 'Katarzyna Nowak',
+    content: 'Firma eventowa na najwyższym poziomie. Organizowaliśmy z nimi galę firmową i wszystko przebiegło perfekcyjnie. Profesjonalna obsługa, świetna komunikacja i niezapomniane wrażenia dla gości.',
+    rating: 5,
+    event_type: 'Event Firmowy',
+    avatar: '',
+    featured: true,
+    created_date: '2024-02-20'
+  },
+  {
+    id: '3',
+    author: 'Marcin i Tomasz',
+    content: 'Najlepsza organizacja imprezy prywatnej jaką mogliśmy sobie wymarzyć. Zespół Ignis Events stworzył niepowtarzalną atmosferę na naszej rocznicy. Polecamy każdemu kto szuka profesjonalistów!',
+    rating: 5,
+    event_type: 'Impreza Prywatna',
+    avatar: '',
+    featured: false,
+    created_date: '2024-03-10'
+  }
+];
 
 const emptyTestimonial = {
   author: '',
@@ -28,35 +62,29 @@ export default function AdminTestimonials() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState(emptyTestimonial);
+  const [testimonials, setTestimonials] = useState([]);
 
-  const queryClient = useQueryClient();
-
-  const { data: testimonials, isLoading } = useQuery({
-    queryKey: ['admin-testimonials'],
-    queryFn: () => base44.entities.Testimonial.list('-created_date'),
-    initialData: []
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Testimonial.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-testimonials'] });
-      closeDialog();
+  // Load testimonials from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(TESTIMONIALS_STORAGE_KEY);
+    if (stored) {
+      try {
+        setTestimonials(JSON.parse(stored));
+      } catch (e) {
+        console.error('Error loading testimonials:', e);
+        setTestimonials(defaultTestimonials);
+        localStorage.setItem(TESTIMONIALS_STORAGE_KEY, JSON.stringify(defaultTestimonials));
+      }
+    } else {
+      setTestimonials(defaultTestimonials);
+      localStorage.setItem(TESTIMONIALS_STORAGE_KEY, JSON.stringify(defaultTestimonials));
     }
-  });
+  }, []);
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Testimonial.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-testimonials'] });
-      closeDialog();
-    }
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Testimonial.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-testimonials'] })
-  });
+  const saveTestimonials = (newTestimonials) => {
+    localStorage.setItem(TESTIMONIALS_STORAGE_KEY, JSON.stringify(newTestimonials));
+    setTestimonials(newTestimonials);
+  };
 
   const openDialog = (item = null) => {
     if (item) {
@@ -77,15 +105,30 @@ export default function AdminTestimonials() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const data = {
+      ...formData,
+      id: editingItem ? editingItem.id : Date.now().toString(),
+      created_date: editingItem ? editingItem.created_date : new Date().toISOString()
+    };
+
     if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, data: formData });
+      const updated = testimonials.map(t => t.id === editingItem.id ? data : t);
+      saveTestimonials(updated);
     } else {
-      createMutation.mutate(formData);
+      saveTestimonials([...testimonials, data]);
     }
+    closeDialog();
   };
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleDelete = (id) => {
+    if (confirm('Czy na pewno chcesz usunąć tę opinię?')) {
+      const updated = testimonials.filter(t => t.id !== id);
+      saveTestimonials(updated);
+    }
   };
 
   if (!checked) return null;
@@ -142,7 +185,7 @@ export default function AdminTestimonials() {
                 <Button size="sm" variant="outline" className="text-white border-slate-600 hover:border-amber-500 hover:text-amber-500" onClick={() => openDialog(item)}>
                   <Pencil className="w-4 h-4 mr-1" /> Edytuj
                 </Button>
-                <Button size="sm" variant="destructive" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => deleteMutation.mutate(item.id)}>
+                <Button size="sm" variant="destructive" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleDelete(item.id)}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
@@ -151,7 +194,7 @@ export default function AdminTestimonials() {
         ))}
       </div>
 
-      {testimonials.length === 0 && !isLoading && (
+      {testimonials.length === 0 && (
         <div className="text-center py-16">
           <p className="text-gray-500 mb-4">Brak opinii</p>
           <Button onClick={() => openDialog()} variant="outline" className="text-white border-slate-600 hover:border-amber-500 hover:text-amber-500">
@@ -243,11 +286,7 @@ export default function AdminTestimonials() {
               <Button type="button" variant="outline" onClick={closeDialog} className="flex-1 text-white border-slate-600 hover:border-amber-500 hover:text-amber-500">
                 Anuluj
               </Button>
-              <Button 
-                type="submit" 
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-black"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
+              <Button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 text-black">
                 {editingItem ? 'Zapisz zmiany' : 'Dodaj opinię'}
               </Button>
             </div>

@@ -46,11 +46,11 @@ VITE_BASE44_APP_BASE_URL=https://api.base44.com
    - Output Directory: `dist` (domyślnie dla Vite)
 
 4. **Zmienne środowiskowe**
-   - W sekcji "Environment Variables" dodaj:
-     - `VITE_BASE44_APP_ID` = twój_app_id
-     - `VITE_BASE44_ACCESS_TOKEN` = twój_access_token
-     - `VITE_BASE44_FUNCTIONS_VERSION` = v1
-     - `VITE_BASE44_APP_BASE_URL` = https://api.base44.com
+   - W sekcji "Environment Variables" dodaj (każda w osobnym wierszu):
+     - `VITE_BASE44_APP_ID` = `6989edde65063fc06a55765d`
+     - `VITE_BASE44_ACCESS_TOKEN` = `062e5cf56d324c539922ea2aa2ee05a3`
+     - `VITE_BASE44_FUNCTIONS_VERSION` = `v1`
+     - `VITE_BASE44_APP_BASE_URL` = `https://api.base44.com`
 
 5. **Wdróż**
    - Kliknij "Deploy"

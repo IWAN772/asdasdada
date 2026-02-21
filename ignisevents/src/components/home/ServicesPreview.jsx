@@ -5,7 +5,7 @@ import { createPageUrl } from '@/utils';
 import { Heart, Building2, Music, PartyPopper, ArrowRight } from 'lucide-react';
 import SectionTitle from '../ui/SectionTitle';
 
-const services = [
+const defaultServices = [
   {
     icon: Heart,
     title: 'Wesela',
@@ -36,7 +36,8 @@ const services = [
   }
 ];
 
-export default function ServicesPreview() {
+export default function ServicesPreview({ services: propServices }) {
+  const services = propServices && propServices.length > 0 ? propServices : defaultServices;
   return (
     <section className="py-24 bg-black relative overflow-hidden">
       {/* Decorative Elements */}

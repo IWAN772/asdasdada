@@ -1,6 +1,4 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../components/admin/AdminLayout';
 import AdminLogin from '../components/admin/AdminLogin';
 import { useAdminAuth } from '../components/admin/useAdminAuth';
@@ -14,6 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 
+// Local storage key
+const SERVICES_STORAGE_KEY = 'ignis_services';
+
 const slugOptions = [
   { value: 'wesela', label: 'Wesela' },
   { value: 'eventy_firmowe', label: 'Eventy Firmowe' },
@@ -21,9 +22,61 @@ const slugOptions = [
   { value: 'imprezy_prywatne', label: 'Imprezy Prywatne' },
 ];
 
+const defaultServices = [
+  {
+    id: '1',
+    slug: 'wesela',
+    icon: 'Heart',
+    name: 'Organizacja Wesel',
+    short_description: 'Kompleksowa organizacja wesela marzeń',
+    full_description: 'Stworzymy dla Was wesele, które przejdzie do historii.',
+    features: ['Koordynacja całego dnia', 'Dobór dostawców', 'Projektowanie dekoracji'],
+    image: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80',
+    price_from: 'od 15 000 zł',
+    order: 1
+  },
+  {
+    id: '2',
+    slug: 'eventy_firmowe',
+    icon: 'Building2',
+    name: 'Eventy Firmowe',
+    short_description: 'Profesjonalna oprawa Twojego biznesu',
+    full_description: 'Organizujemy konferencje, gale i eventy firmowe.',
+    features: ['Konferencje', 'Gale firmowe', 'Imprezy integracyjne'],
+    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80',
+    price_from: 'od 20 000 zł',
+    order: 2
+  },
+  {
+    id: '3',
+    slug: 'koncerty_gale',
+    icon: 'Music',
+    name: 'Koncerty i Gale',
+    short_description: 'Wielkie wydarzenia na najwyższym poziomie',
+    full_description: 'Realizujemy koncerty i festiwale.',
+    features: ['Produkcja koncertów', 'Obsługa techniczna', 'Bezpieczeństwo'],
+    image: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&q=80',
+    price_from: 'od 50 000 zł',
+    order: 3
+  },
+  {
+    id: '4',
+    slug: 'imprezy_prywatne',
+    icon: 'PartyPopper',
+    name: 'Imprezy Prywatne',
+    short_description: 'Każda okazja zasługuje na wyjątkową oprawę',
+    full_description: 'Urodziny, rocznice i przyjęcia okolicznościowe.',
+    features: ['Urodziny', 'Rocznice', 'Przyjęcia tematyczne'],
+    image: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80',
+    price_from: 'od 5 000 zł',
+    order: 4
+  }
+];
+
 const emptyService = {
   name: '',
   slug: 'wesela',
+  icon: 'Heart',
   short_description: '',
   full_description: '',
   features: [],
@@ -38,35 +91,29 @@ export default function AdminServices() {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState(emptyService);
   const [featuresText, setFeaturesText] = useState('');
+  const [services, setServices] = useState([]);
 
-  const queryClient = useQueryClient();
-
-  const { data: services, isLoading } = useQuery({
-    queryKey: ['admin-services'],
-    queryFn: () => base44.entities.Service.list('order'),
-    initialData: []
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Service.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-services'] });
-      closeDialog();
+  // Load services from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(SERVICES_STORAGE_KEY);
+    if (stored) {
+      try {
+        setServices(JSON.parse(stored));
+      } catch (e) {
+        console.error('Error loading services:', e);
+        setServices(defaultServices);
+        localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(defaultServices));
+      }
+    } else {
+      setServices(defaultServices);
+      localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(defaultServices));
     }
-  });
+  }, []);
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Service.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-services'] });
-      closeDialog();
-    }
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Service.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-services'] })
-  });
+  const saveServices = (newServices) => {
+    localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(newServices));
+    setServices(newServices);
+  };
 
   const openDialog = (item = null) => {
     if (item) {
@@ -92,18 +139,28 @@ export default function AdminServices() {
     e.preventDefault();
     const data = {
       ...formData,
-      features: featuresText.split('\n').filter(f => f.trim())
+      features: featuresText.split('\n').filter(f => f.trim()),
+      id: editingItem ? editingItem.id : Date.now().toString()
     };
 
     if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, data });
+      const updated = services.map(s => s.id === editingItem.id ? data : s);
+      saveServices(updated);
     } else {
-      createMutation.mutate(data);
+      saveServices([...services, data]);
     }
+    closeDialog();
   };
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleDelete = (id) => {
+    if (confirm('Czy na pewno chcesz usunąć tę usługę?')) {
+      const updated = services.filter(s => s.id !== id);
+      saveServices(updated);
+    }
   };
 
   if (!checked) return null;
@@ -148,7 +205,7 @@ export default function AdminServices() {
                   <Button size="sm" variant="outline" className="text-white border-slate-600 hover:border-amber-500 hover:text-amber-500" onClick={() => openDialog(item)}>
                     <Pencil className="w-4 h-4" />
                   </Button>
-                  <Button size="sm" variant="destructive" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => deleteMutation.mutate(item.id)}>
+                  <Button size="sm" variant="destructive" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleDelete(item.id)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
@@ -158,7 +215,7 @@ export default function AdminServices() {
         ))}
       </div>
 
-      {services.length === 0 && !isLoading && (
+      {services.length === 0 && (
         <div className="text-center py-16">
           <p className="text-gray-500 mb-4">Brak usług</p>
           <Button onClick={() => openDialog()} variant="outline" className="text-white border-slate-600 hover:border-amber-500 hover:text-amber-500">
@@ -260,7 +317,6 @@ export default function AdminServices() {
               <Button 
                 type="submit" 
                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-black"
-                disabled={createMutation.isPending || updateMutation.isPending}
               >
                 {editingItem ? 'Zapisz zmiany' : 'Dodaj usługę'}
               </Button>

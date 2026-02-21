@@ -28,7 +28,7 @@
 
   /* Utility: container with subtle entrance animation */
   /* Make the site layout stretch full width while keeping internal padding */
-  .page-container { @apply w-full max-w-none mx-auto px-4 sm:px-6 lg:px-10; }
+  .page-container { @apply w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10; }
 
   /* Nav link helper */
   .nav-link { @apply text-white text-sm uppercase tracking-wider font-medium transition-colors inline-block; }

@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { Heart, Building2, Music, PartyPopper, Check, ArrowRight } from 'lucide-react';
 import SectionTitle from '../components/ui/SectionTitle';
 import GoldButton from '../components/ui/GoldButton';
@@ -9,10 +7,14 @@ import CTASection from '../components/home/CTASection';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
+// Local storage key
+const SERVICES_STORAGE_KEY = 'ignis_services';
+
 const defaultServices = [
   {
+    id: '1',
     slug: 'wesela',
-    icon: Heart,
+    icon: 'Heart',
     name: 'Organizacja Wesel',
     short_description: 'Kompleksowa organizacja wesela marzeń',
     full_description: 'Stworzymy dla Was wesele, które przejdzie do historii. Od pierwszego spotkania do ostatniego tańca - zajmujemy się wszystkim, abyście mogli cieszyć się tym wyjątkowym dniem.',
@@ -27,11 +29,13 @@ const defaultServices = [
       'Transport i zakwaterowanie gości'
     ],
     image: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80',
-    price_from: 'od 15 000 zł'
+    price_from: 'od 15 000 zł',
+    order: 1
   },
   {
+    id: '2',
     slug: 'eventy_firmowe',
-    icon: Building2,
+    icon: 'Building2',
     name: 'Eventy Firmowe',
     short_description: 'Profesjonalna oprawa Twojego biznesu',
     full_description: 'Organizujemy konferencje, gale, integracje firmowe i eventy promocyjne. Dbamy o wizerunek Twojej firmy i zapewniamy niezapomniane doświadczenia dla uczestników.',
@@ -46,11 +50,13 @@ const defaultServices = [
       'Branding i materiały promocyjne'
     ],
     image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80',
-    price_from: 'od 20 000 zł'
+    price_from: 'od 20 000 zł',
+    order: 2
   },
   {
+    id: '3',
     slug: 'koncerty_gale',
-    icon: Music,
+    icon: 'Music',
     name: 'Koncerty i Gale',
     short_description: 'Wielkie wydarzenia na najwyższym poziomie',
     full_description: 'Realizujemy koncerty, festiwale i gale na najwyższym poziomie. Mamy doświadczenie w organizacji wydarzeń dla tysięcy uczestników z pełną oprawą techniczną.',
@@ -65,11 +71,13 @@ const defaultServices = [
       'Marketing i promocja'
     ],
     image: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&q=80',
-    price_from: 'od 50 000 zł'
+    price_from: 'od 50 000 zł',
+    order: 3
   },
   {
+    id: '4',
     slug: 'imprezy_prywatne',
-    icon: PartyPopper,
+    icon: 'PartyPopper',
     name: 'Imprezy Prywatne',
     short_description: 'Każda okazja zasługuje na wyjątkową oprawę',
     full_description: 'Urodziny, rocznice, przyjęcia okolicznościowe - każde prywatne wydarzenie organizujemy z taką samą starannością i pasją jak największe eventy.',
@@ -84,18 +92,36 @@ const defaultServices = [
       'Eleganckie kolacje prywatne'
     ],
     image: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80',
-    price_from: 'od 5 000 zł'
+    price_from: 'od 5 000 zł',
+    order: 4
   }
 ];
 
+const iconMap = {
+  Heart,
+  Building2,
+  Music,
+  PartyPopper
+};
+
 export default function Oferta() {
   const [activeService, setActiveService] = useState(null);
-  
-  const { data: dbServices } = useQuery({
-    queryKey: ['services'],
-    queryFn: () => base44.entities.Service.list('order'),
-    initialData: []
-  });
+  const [services, setServices] = useState(defaultServices);
+
+  useEffect(() => {
+    // Load services from localStorage
+    const stored = localStorage.getItem(SERVICES_STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.length > 0) {
+          setServices(parsed);
+        }
+      } catch (e) {
+        console.error('Error loading services:', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -108,7 +134,6 @@ export default function Oferta() {
     }
   }, []);
 
-  const services = dbServices.length > 0 ? dbServices : defaultServices;
   const icons = { wesela: Heart, eventy_firmowe: Building2, koncerty_gale: Music, imprezy_prywatne: PartyPopper };
 
   return (
@@ -146,10 +171,10 @@ export default function Oferta() {
       <section className="py-24">
         <div className="page-container">
           {services.map((service, index) => {
-            const Icon = icons[service.slug] || PartyPopper;
+            const Icon = iconMap[service.icon] || iconMap[service.slug] || PartyPopper;
             const isEven = index % 2 === 0;
             
-              return (
+            return (
               <motion.div
                 key={service.slug}
                 id={service.slug}
@@ -157,8 +182,8 @@ export default function Oferta() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 className={`grid lg:grid-cols-2 gap-12 items-center mb-24 last:mb-0 ${
-                  activeService === service.slug ? 'ring-2 ring-gold-500 ring-offset-8 ring-offset-white rounded-lg' : ''
-                }`}>
+                  activeService === service.slug ? 'ring-2 ring-amber-500 ring-offset-8 ring-offset-white rounded-lg' : ''
+                }`}
               >
                 <div className={`${isEven ? 'lg:order-1' : 'lg:order-2'}`}>
                   <div className="relative overflow-hidden group">
@@ -169,7 +194,7 @@ export default function Oferta() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                     {service.price_from && (
-                      <div className="absolute bottom-4 left-4 bg-gold-500 text-black px-4 py-2 font-semibold">
+                      <div className="absolute bottom-4 left-4 bg-amber-500 text-black px-4 py-2 font-semibold">
                         {service.price_from}
                       </div>
                     )}
@@ -191,9 +216,9 @@ export default function Oferta() {
                   <div className="grid sm:grid-cols-2 gap-3 mb-8">
                     {(service.features || []).map((feature, i) => (
                       <div key={i} className="flex items-center gap-2 text-gray-700">
-                          <Check className="w-5 h-5 text-gold flex-shrink-0" />
-                          <span>{feature}</span>
-                        </div>
+                        <Check className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                        <span>{feature}</span>
+                      </div>
                     ))}
                   </div>
 
@@ -233,7 +258,7 @@ export default function Oferta() {
                 transition={{ delay: index * 0.1 }}
                 className="text-center relative"
               >
-                <div className="text-6xl font-bold text-gold/20 mb-4">{item.step}</div>
+                <div className="text-6xl font-bold text-amber-500/20 mb-4">{item.step}</div>
                 <h3 className="text-xl font-bold text-black mb-2">{item.title}</h3>
                 <p className="text-gray-600">{item.desc}</p>
                 {index < 3 && (
