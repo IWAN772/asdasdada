@@ -1,0 +1,61 @@
+{
+  "name": "Event",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Tytuł realizacji"
+    },
+    "short_description": {
+      "type": "string",
+      "description": "Krótki opis"
+    },
+    "full_description": {
+      "type": "string",
+      "description": "Pełny opis"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "wesela",
+        "eventy_firmowe",
+        "koncerty_gale",
+        "imprezy_prywatne"
+      ],
+      "description": "Kategoria"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data wydarzenia"
+    },
+    "location": {
+      "type": "string",
+      "description": "Lokalizacja"
+    },
+    "guests_count": {
+      "type": "number",
+      "description": "Liczba gości"
+    },
+    "main_image": {
+      "type": "string",
+      "description": "Zdjęcie główne"
+    },
+    "gallery": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Galeria zdjęć"
+    },
+    "featured": {
+      "type": "boolean",
+      "default": false,
+      "description": "Wyróżniona realizacja"
+    }
+  },
+  "required": [
+    "title",
+    "category"
+  ]
+}

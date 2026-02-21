@@ -1,0 +1,58 @@
+{
+  "name": "ContactMessage",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Imi\u0119 i nazwisko"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Telefon"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "wesele",
+        "event_firmowy",
+        "koncert_gala",
+        "impreza_prywatna",
+        "inne"
+      ],
+      "description": "Typ wydarzenia"
+    },
+    "event_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Planowana data"
+    },
+    "guests_count": {
+      "type": "number",
+      "description": "Liczba go\u015bci"
+    },
+    "message": {
+      "type": "string",
+      "description": "Wiadomo\u015b\u0107"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "new",
+        "read",
+        "replied",
+        "archived"
+      ],
+      "default": "new",
+      "description": "Status wiadomo\u015bci"
+    }
+  },
+  "required": [
+    "name",
+    "email",
+    "message"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "SiteSetting",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Klucz ustawienia"
+    },
+    "value": {
+      "type": "string",
+      "description": "Warto\u015b\u0107"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "textarea",
+        "image",
+        "html"
+      ],
+      "default": "text",
+      "description": "Typ warto\u015bci"
+    }
+  },
+  "required": [
+    "key",
+    "value"
+  ]
+}
