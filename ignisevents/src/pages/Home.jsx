@@ -7,12 +7,7 @@ import Testimonials from '../components/home/Testimonials';
 import CTASection from '../components/home/CTASection';
 import useEntranceAnimation from '@/lib/useEntranceAnimation';
 
-// Storage keys
-const EVENTS_STORAGE_KEY = 'ignis_events';
-const TESTIMONIALS_STORAGE_KEY = 'ignis_testimonials';
-const SERVICES_STORAGE_KEY = 'ignis_services';
-
-// Default data fallbacks
+// Default data fallbacks - always show these first
 const defaultFeaturedEvents = [
   {
     id: '1',
@@ -106,54 +101,66 @@ const defaultServices = [
 
 export default function Home() {
   const refContainer = useRef(null);
-  const [featuredEvents, setFeaturedEvents] = useState([]);
-  const [testimonials, setTestimonials] = useState([]);
-  const [services, setServices] = useState([]);
+  const [featuredEvents, setFeaturedEvents] = useState(defaultFeaturedEvents);
+  const [testimonials, setTestimonials] = useState(defaultTestimonials);
+  const [services, setServices] = useState(defaultServices);
+  const [isLoading, setIsLoading] = useState(false);
   
   useEntranceAnimation(refContainer);
 
-  // Load all data from localStorage on mount
+  // Try to load from Base44, but fall back to defaults on error
   useEffect(() => {
-    // Load featured events
-    try {
-      const storedEvents = localStorage.getItem(EVENTS_STORAGE_KEY);
-      if (storedEvents) {
-        const events = JSON.parse(storedEvents);
-        setFeaturedEvents(events.filter(e => e.featured).slice(0, 6));
-      } else {
-        setFeaturedEvents(defaultFeaturedEvents);
-      }
-    } catch (e) {
-      console.error('Error loading events:', e);
-      setFeaturedEvents(defaultFeaturedEvents);
-    }
+    const fetchData = async () => {
+      setIsLoading(true);
+      
+      // Try to import base44 dynamically
+      try {
+        const { base44 } = await import('@/api/base44Client');
+        
+        // Try fetching events
+        try {
+          const eventsResponse = await base44.entities.Event.list();
+          const events = eventsResponse?.data || eventsResponse || [];
+          const featuredEventsData = events.filter(e => e.featured).slice(0, 6);
+          if (featuredEventsData.length > 0) {
+            setFeaturedEvents(featuredEventsData);
+          }
+        } catch (e) {
+          console.log('Using default events (Base44 unavailable)');
+        }
 
-    // Load testimonials
-    try {
-      const storedTestimonials = localStorage.getItem(TESTIMONIALS_STORAGE_KEY);
-      if (storedTestimonials) {
-        const test = JSON.parse(storedTestimonials);
-        setTestimonials(test.filter(t => t.featured));
-      } else {
-        setTestimonials(defaultTestimonials);
-      }
-    } catch (e) {
-      console.error('Error loading testimonials:', e);
-      setTestimonials(defaultTestimonials);
-    }
+        // Try fetching testimonials
+        try {
+          const testimonialsResponse = await base44.entities.Testimonial.list();
+          const testData = testimonialsResponse?.data || testimonialsResponse || [];
+          const featuredTestimonials = testData.filter(t => t.featured);
+          if (featuredTestimonials.length > 0) {
+            setTestimonials(featuredTestimonials);
+          }
+        } catch (e) {
+          console.log('Using default testimonials (Base44 unavailable)');
+        }
 
-    // Load services
-    try {
-      const storedServices = localStorage.getItem(SERVICES_STORAGE_KEY);
-      if (storedServices) {
-        setServices(JSON.parse(storedServices));
-      } else {
-        setServices(defaultServices);
+        // Try fetching services
+        try {
+          const servicesResponse = await base44.entities.Service.list();
+          const servicesData = servicesResponse?.data || servicesResponse || [];
+          if (servicesData.length > 0) {
+            setServices(servicesData);
+          }
+        } catch (e) {
+          console.log('Using default services (Base44 unavailable)');
+        }
+      } catch (e) {
+        console.log('Base44 client unavailable, using default data');
       }
-    } catch (e) {
-      console.error('Error loading services:', e);
-      setServices(defaultServices);
-    }
+      
+      setIsLoading(false);
+    };
+
+    // Small delay to ensure page loads first
+    const timer = setTimeout(fetchData, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   return (

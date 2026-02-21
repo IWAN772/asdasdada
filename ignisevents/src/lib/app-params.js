@@ -34,21 +34,33 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 	return null;
 }
 
+// Default values that work on hosting
+const DEFAULT_APP_ID = '6989edde65063fc06a55765d';
+const DEFAULT_ACCESS_TOKEN = '062e5cf56d324c539922ea2aa2ee05a3';
+const DEFAULT_APP_BASE_URL = 'https://api.base44.com';
+
 const getAppParams = () => {
-	if (getAppParamValue("clear_access_token") === 'true') {
+	if (typeof window !== 'undefined' && getAppParamValue("clear_access_token") === 'true') {
 		storage.removeItem('base44_access_token');
 		storage.removeItem('token');
 	}
+	
+	// Get from environment variables or use defaults
+	const envAppId = typeof import.meta !== 'undefined' ? import.meta?.env?.VITE_BASE44_APP_ID : undefined;
+	const envToken = typeof import.meta !== 'undefined' ? import.meta?.env?.VITE_BASE44_ACCESS_TOKEN : undefined;
+	const envFunctionsVersion = typeof import.meta !== 'undefined' ? import.meta?.env?.VITE_BASE44_FUNCTIONS_VERSION : undefined;
+	const envAppBaseUrl = typeof import.meta !== 'undefined' ? import.meta?.env?.VITE_BASE44_APP_BASE_URL : undefined;
+	
 	const params = {
-		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID }),
-		token: getAppParamValue("access_token", { defaultValue: import.meta.env.VITE_BASE44_ACCESS_TOKEN, removeFromUrl: true }),
-		fromUrl: getAppParamValue("from_url", { defaultValue: window.location.href }),
-		functionsVersion: getAppParamValue("functions_version", { defaultValue: import.meta.env.VITE_BASE44_FUNCTIONS_VERSION || 'v1' }),
-		appBaseUrl: getAppParamValue("app_base_url", { defaultValue: import.meta.env.VITE_BASE44_APP_BASE_URL }),
+		appId: getAppParamValue("app_id", { defaultValue: envAppId || DEFAULT_APP_ID }),
+		token: getAppParamValue("access_token", { defaultValue: envToken || DEFAULT_ACCESS_TOKEN, removeFromUrl: true }),
+		fromUrl: getAppParamValue("from_url", { defaultValue: typeof window !== 'undefined' ? window.location.href : '' }),
+		functionsVersion: getAppParamValue("functions_version", { defaultValue: envFunctionsVersion || 'v1' }),
+		appBaseUrl: getAppParamValue("app_base_url", { defaultValue: envAppBaseUrl || DEFAULT_APP_BASE_URL }),
 	};
 	
 	// Debug logging
-	if (typeof window !== 'undefined') {
+	if (typeof window !== 'undefined' && import.meta?.env?.DEV) {
 		console.log('[AppParams] Loaded config:', {
 			appId: params.appId?.substring(0, 8) + '...' || 'MISSING',
 			token: params.token?.substring(0, 8) + '...' || 'MISSING',

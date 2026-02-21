@@ -12,8 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
-
-const STORAGE_KEY = 'ignis_events';
+import { base44 } from '@/api/base44Client';
 
 const categories = [
   { value: 'wesela', label: 'Wesela' },
@@ -36,7 +35,6 @@ const emptyEvent = {
   guests_count: ''
 };
 
-// Default events for initial setup
 const defaultEvents = [
   {
     id: '1',
@@ -71,30 +69,6 @@ const defaultEvents = [
   },
 ];
 
-// Load events from localStorage
-const loadEvents = () => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error('Error loading events:', e);
-  }
-  // Initialize with default events if nothing stored
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultEvents));
-  return defaultEvents;
-};
-
-// Save events to localStorage
-const saveEvents = (events) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-  } catch (e) {
-    console.error('Error saving events:', e);
-  }
-};
-
 export default function AdminEvents() {
   const { isAuthorized, checked, setIsAuthorized } = useAdminAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -102,12 +76,28 @@ export default function AdminEvents() {
   const [formData, setFormData] = useState(emptyEvent);
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Load events on mount
   useEffect(() => {
-    const loadedEvents = loadEvents();
-    setEvents(loadedEvents);
-    setIsLoading(false);
+    const loadEvents = async () => {
+      try {
+        const response = await base44.entities.Event.list();
+        const data = response.data || response || [];
+        if (data.length > 0) {
+          setEvents(data);
+        } else {
+          for (const event of defaultEvents) {
+            await base44.entities.Event.create(event);
+          }
+          setEvents(defaultEvents);
+        }
+      } catch (e) {
+        console.error('Error loading events:', e);
+        setEvents(defaultEvents);
+      }
+      setIsLoading(false);
+    };
+    loadEvents();
   }, []);
 
   const openDialog = (event = null) => {
@@ -133,30 +123,39 @@ export default function AdminEvents() {
     setFormData(emptyEvent);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSaving(true);
     const newEvent = {
       ...formData,
       guests_count: formData.guests_count ? parseInt(formData.guests_count) : null
     };
 
-    let updatedEvents;
-    if (editingEvent) {
-      updatedEvents = events.map(ev => ev.id === editingEvent.id ? newEvent : ev);
-    } else {
-      updatedEvents = [newEvent, ...events];
+    try {
+      if (editingEvent) {
+        await base44.entities.Event.update(editingEvent.id, newEvent);
+        setEvents(events.map(ev => ev.id === editingEvent.id ? { ...ev, ...newEvent } : ev));
+      } else {
+        const created = await base44.entities.Event.create(newEvent);
+        setEvents([created, ...events]);
+      }
+      closeDialog();
+    } catch (e) {
+      console.error('Error saving event:', e);
+      alert('Błąd podczas zapisywania: ' + e.message);
     }
-
-    saveEvents(updatedEvents);
-    setEvents(updatedEvents);
-    closeDialog();
+    setIsSaving(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Czy na pewno chcesz usunąć tę realizację?')) {
-      const updatedEvents = events.filter(ev => ev.id !== id);
-      saveEvents(updatedEvents);
-      setEvents(updatedEvents);
+      try {
+        await base44.entities.Event.delete(id);
+        setEvents(events.filter(ev => ev.id !== id));
+      } catch (e) {
+        console.error('Error deleting event:', e);
+        alert('Błąd podczas usuwania: ' + e.message);
+      }
     }
   };
 
@@ -177,7 +176,6 @@ export default function AdminEvents() {
         </Button>
       </div>
 
-      {/* Events Grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {events.map((event) => (
           <Card key={event.id} className="bg-slate-900 border-slate-800 overflow-hidden group">
@@ -231,7 +229,6 @@ export default function AdminEvents() {
         </div>
       )}
 
-      {/* Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -354,8 +351,9 @@ export default function AdminEvents() {
               <Button 
                 type="submit" 
                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-black"
+                disabled={isSaving}
               >
-                {editingEvent ? 'Zapisz zmiany' : 'Dodaj realizację'}
+                {isSaving ? 'Zapisywanie...' : (editingEvent ? 'Zapisz zmiany' : 'Dodaj realizację')}
               </Button>
             </div>
           </form>
