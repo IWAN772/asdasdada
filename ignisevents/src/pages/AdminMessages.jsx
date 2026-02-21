@@ -1,7 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import AdminLayout from '../components/admin/AdminLayout';
 import AdminLogin from '../components/admin/AdminLogin';
 import { useAdminAuth } from '../components/admin/useAdminAuth';
@@ -10,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+// Local storage key for messages
+const MESSAGES_STORAGE_KEY = 'ignis_contact_messages';
 
 const statusLabels = {
   new: { label: 'Nowa', color: 'bg-amber-500' },
@@ -30,73 +31,84 @@ export default function AdminMessages() {
   const { isAuthorized, checked, setIsAuthorized } = useAdminAuth();
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [messages, setMessages] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const queryClient = useQueryClient();
-
-  const { data: messages, isLoading, error } = useQuery({
-    queryKey: ['admin-messages'],
-    queryFn: async () => {
-      try {
-        console.log('Fetching messages from ContactMessage...');
-        const appId = import.meta.env.VITE_BASE44_APP_ID;
-        const apiKey = import.meta.env.VITE_BASE44_ACCESS_TOKEN;
-        console.log('Using appId:', appId?.substring(0, 8) + '...');
-        console.log('Using apiKey:', apiKey?.substring(0, 8) + '...');
-        
-        // Use direct HTTP request instead of Base44 SDK
-        const response = await fetch(
-          `https://app.base44.com/api/apps/${appId}/entities/ContactMessage?sort=-created_date`,
-          {
-            method: 'GET',
-            headers: {
-              'api_key': apiKey,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`API Error ${response.status}: ${errorData.message || 'Unknown error'}`);
-        }
-        
-        const result = await response.json();
-        console.log('Messages fetched successfully:', result);
-        return result.data || result;
-      } catch (err) {
-        console.error('Error fetching messages:', {
-          message: err.message,
-          fullError: err
-        });
-        throw err;
-      }
-    },
-    initialData: [],
-    retry: 1
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.ContactMessage.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-messages'] })
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.ContactMessage.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-messages'] });
-      setSelectedMessage(null);
+  // Load messages from localStorage
+  const loadMessages = () => {
+    try {
+      const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
+      const data = raw ? JSON.parse(raw) : [];
+      // Sort by created_date descending
+      data.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      setMessages(data);
+    } catch (err) {
+      console.error('Error loading messages from localStorage:', err);
+      setMessages([]);
+    } finally {
+      setIsLoading(false);
     }
-  });
+  };
+
+  useEffect(() => {
+    loadMessages();
+    
+    // Listen for new messages
+    const handleMessagesUpdated = () => {
+      loadMessages();
+    };
+    
+    window.addEventListener('ignis-messages-updated', handleMessagesUpdated);
+    
+    // Also poll periodically in case user sends message from different tab
+    const interval = setInterval(loadMessages, 5000);
+    
+    return () => {
+      window.removeEventListener('ignis-messages-updated', handleMessagesUpdated);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const updateMessageStatus = (id, newStatus) => {
+    try {
+      const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
+      const data = raw ? JSON.parse(raw) : [];
+      const updated = data.map(msg => 
+        msg.id === id ? { ...msg, status: newStatus } : msg
+      );
+      localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(updated));
+      setMessages(updated);
+      
+      if (selectedMessage && selectedMessage.id === id) {
+        setSelectedMessage({ ...selectedMessage, status: newStatus });
+      }
+    } catch (err) {
+      console.error('Error updating message status:', err);
+    }
+  };
+
+  const deleteMessage = (id) => {
+    try {
+      const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
+      const data = raw ? JSON.parse(raw) : [];
+      const updated = data.filter(msg => msg.id !== id);
+      localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(updated));
+      setMessages(updated);
+      setSelectedMessage(null);
+    } catch (err) {
+      console.error('Error deleting message:', err);
+    }
+  };
 
   const openMessage = (message) => {
     setSelectedMessage(message);
     if (message.status === 'new') {
-      updateMutation.mutate({ id: message.id, data: { status: 'read' } });
+      updateMessageStatus(message.id, 'read');
     }
   };
 
   const updateStatus = (id, status) => {
-    updateMutation.mutate({ id, data: { status } });
+    updateMessageStatus(id, status);
   };
 
   const filteredMessages = filterStatus === 'all' 
@@ -133,24 +145,6 @@ export default function AdminMessages() {
           ))}
         </div>
       </div>
-
-      {/* Error Display */}
-      {error && (
-        <Card className="bg-red-900/20 border-red-500 mb-4 p-4">
-          <div className="text-red-400 text-sm">
-            <p className="font-semibold">Błąd ładowania wiadomości:</p>
-            <p>{error.message}</p>
-            {error.response?.data && (
-              <details className="mt-2 text-xs">
-                <summary className="cursor-pointer">Szczegóły błędu</summary>
-                <pre className="mt-2 bg-black/50 p-2 rounded overflow-auto max-h-40">
-                  {JSON.stringify(error.response.data, null, 2)}
-                </pre>
-              </details>
-            )}
-          </div>
-        </Card>
-      )}
 
       {/* Messages List */}
       <div className="space-y-4">
@@ -309,7 +303,7 @@ export default function AdminMessages() {
                   size="sm" 
                   variant="destructive"
                   className="bg-red-600 hover:bg-red-700 text-white"
-                  onClick={() => deleteMutation.mutate(selectedMessage.id)}
+                  onClick={() => deleteMessage(selectedMessage.id)}
                 >
                   <Trash2 className="w-4 h-4 mr-1" /> Usuń
                 </Button>

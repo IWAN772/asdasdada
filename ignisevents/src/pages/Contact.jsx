@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Phone, Mail, MapPin, Clock, Send, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -18,6 +16,9 @@ const eventTypes = [
   { value: 'inne', label: 'Inne' },
 ];
 
+// Local storage key for messages
+const MESSAGES_STORAGE_KEY = 'ignis_contact_messages';
+
 export default function Contact() {
   const [formData, setFormData] = useState({
     name: '',
@@ -29,6 +30,7 @@ export default function Contact() {
     message: ''
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -44,11 +46,46 @@ export default function Contact() {
     }
   }, []);
 
-  const queryClient = useQueryClient();
+  const saveMessageToLocalStorage = (data) => {
+    try {
+      const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
+      const messages = raw ? JSON.parse(raw) : [];
+      
+      const newMessage = {
+        id: Date.now().toString(),
+        ...data,
+        status: 'new',
+        created_date: new Date().toISOString()
+      };
+      
+      messages.unshift(newMessage);
+      localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(messages));
+      
+      // Dispatch custom event to notify admin panel
+      window.dispatchEvent(new Event('ignis-messages-updated'));
+      
+      return true;
+    } catch (err) {
+      console.error('Error saving message to localStorage:', err);
+      return false;
+    }
+  };
 
-  const mutation = useMutation({
-    mutationFn: (data) => base44.entities.ContactMessage.create(data),
-    onSuccess: () => {
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    
+    const messageData = {
+      ...formData,
+      guests_count: formData.guests_count ? parseInt(formData.guests_count) : null
+    };
+    
+    // Save to localStorage
+    const success = saveMessageToLocalStorage(messageData);
+    
+    setIsSaving(false);
+    
+    if (success) {
       setIsSubmitted(true);
       setFormData({
         name: '',
@@ -59,21 +96,7 @@ export default function Contact() {
         guests_count: '',
         message: ''
       });
-      // ensure admin messages list refreshes if admin panel is open
-      try { queryClient.invalidateQueries({ queryKey: ['admin-messages'] }); } catch (e) { /* ignore */ }
     }
-    ,
-    onError: (err) => {
-      console.error('ContactMessage.create error:', err);
-    }
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    mutation.mutate({
-      ...formData,
-      guests_count: formData.guests_count ? parseInt(formData.guests_count) : null
-    });
   };
 
   const handleChange = (field, value) => {
@@ -356,8 +379,8 @@ export default function Contact() {
                       />
                     </div>
 
-                    <GoldButton type="submit" className="w-full" disabled={mutation.isPending}>
-                      {mutation.isPending ? (
+                    <GoldButton type="submit" className="w-full" disabled={isSaving}>
+                      {isSaving ? (
                         'Wysyłanie...'
                       ) : (
                         <>
