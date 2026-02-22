@@ -8,9 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-
-// Local storage key for messages
-const MESSAGES_STORAGE_KEY = 'ignis_contact_messages';
+import { base44 } from '@/api/base44Client';
 
 const statusLabels = {
   new: { label: 'Nowa', color: 'bg-amber-500' },
@@ -34,16 +32,16 @@ export default function AdminMessages() {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load messages from localStorage
-  const loadMessages = () => {
+  // Load messages from Base44 (global storage)
+  const loadMessages = async () => {
     try {
-      const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
-      const data = raw ? JSON.parse(raw) : [];
+      const response = await base44.entities.ContactMessage.list({ limit: 100 });
+      const data = response.items || response || [];
       // Sort by created_date descending
       data.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
       setMessages(data);
     } catch (err) {
-      console.error('Error loading messages from localStorage:', err);
+      console.error('Error loading messages from Base44:', err);
       setMessages([]);
     } finally {
       setIsLoading(false);
@@ -53,30 +51,22 @@ export default function AdminMessages() {
   useEffect(() => {
     loadMessages();
     
-    // Listen for new messages
-    const handleMessagesUpdated = () => {
-      loadMessages();
-    };
-    
-    window.addEventListener('ignis-messages-updated', handleMessagesUpdated);
-    
-    // Also poll periodically in case user sends message from different tab
-    const interval = setInterval(loadMessages, 5000);
+    // Poll periodically to check for new messages
+    const interval = setInterval(loadMessages, 10000);
     
     return () => {
-      window.removeEventListener('ignis-messages-updated', handleMessagesUpdated);
       clearInterval(interval);
     };
   }, []);
 
-  const updateMessageStatus = (id, newStatus) => {
+  const updateMessageStatus = async (id, newStatus) => {
     try {
-      const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
-      const data = raw ? JSON.parse(raw) : [];
-      const updated = data.map(msg => 
+      await base44.entities.ContactMessage.update(id, { status: newStatus });
+      
+      // Update local state
+      const updated = messages.map(msg => 
         msg.id === id ? { ...msg, status: newStatus } : msg
       );
-      localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(updated));
       setMessages(updated);
       
       if (selectedMessage && selectedMessage.id === id) {
@@ -87,12 +77,12 @@ export default function AdminMessages() {
     }
   };
 
-  const deleteMessage = (id) => {
+  const deleteMessage = async (id) => {
     try {
-      const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
-      const data = raw ? JSON.parse(raw) : [];
-      const updated = data.filter(msg => msg.id !== id);
-      localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(updated));
+      await base44.entities.ContactMessage.delete(id);
+      
+      // Update local state
+      const updated = messages.filter(msg => msg.id !== id);
       setMessages(updated);
       setSelectedMessage(null);
     } catch (err) {

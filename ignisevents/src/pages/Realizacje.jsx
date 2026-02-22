@@ -94,32 +94,40 @@ const defaultEvents = [
   },
 ];
 
-// Load events from localStorage or use defaults
-const loadEvents = () => {
-  try {
-    const stored = localStorage.getItem('ignis_events');
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error('Error loading events from localStorage:', e);
-  }
-  return defaultEvents;
-};
-
 export default function Realizacje() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState(defaultEvents);
+  const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef(null);
   
   useEntranceAnimation(containerRef);
 
-  // Load events on mount
+  // Load events from Base44 or use defaults
   useEffect(() => {
-    const loadedEvents = loadEvents();
-    setEvents(loadedEvents);
+    const loadEvents = async () => {
+      try {
+        // Dynamic import to handle Base44 errors
+        const { base44 } = await import('@/api/base44Client');
+        
+        if (base44) {
+          const result = await base44.entities.Event.list({ limit: 100 });
+          if (result && result.items && result.items.length > 0) {
+            setEvents(result.items);
+          }
+        }
+      } catch (error) {
+        console.log('Using default events (Base44 not available)');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Small delay to not block initial render
+    setTimeout(() => {
+      loadEvents();
+    }, 100);
   }, []);
 
   const filteredEvents = activeCategory === 'all' 
@@ -271,7 +279,7 @@ export default function Realizacje() {
             </AnimatePresence>
           </div>
 
-          {filteredEvents.length === 0 && (
+          {filteredEvents.length === 0 && !isLoading && (
             <div className="text-center py-12">
               <p className="text-gray-600 text-lg">Brak realizacji w tej kategorii.</p>
             </div>

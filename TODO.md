@@ -1,13 +1,11 @@
-# TODO - Fix Realizacje Implementation
+# TODO - Make Messages Global (Base44)
 
-## Tasks:
-- [x] 1. Analyze the codebase and identify issues
-- [ ] 2. Fix Event entity schema (entities/Event)
-- [ ] 3. Fix queries in Realizacje.jsx
-- [ ] 4. Fix queries in Home.jsx
-- [ ] 5. Test the implementation
+## Status: In Progress
 
-## Issues Found:
-1. Event entity has wrong schema (ContactMessage instead of Event)
-2. Query API calls might need correction for Base44 SDK
-3. Missing error handling in queries
+### Files to edit:
+- [x] ignisevents/src/pages/Contact.jsx - Connect to Base44 for sending messages
+- [ ] ignisevents/src/pages/AdminMessages.jsx - Connect to Base44 for loading/managing messages
+
+### Already working (connected to Base44):
+- [x] Realizacje (Realizations) - Event entity
+- [x] Galeria (Gallery) - GalleryImage entity

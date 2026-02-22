@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import GoldButton from '../components/ui/GoldButton';
+import { base44 } from '@/api/base44Client';
 
 const eventTypes = [
   { value: 'wesele', label: 'Wesele' },
@@ -15,9 +16,6 @@ const eventTypes = [
   { value: 'impreza_prywatna', label: 'Impreza Prywatna' },
   { value: 'inne', label: 'Inne' },
 ];
-
-// Local storage key for messages
-const MESSAGES_STORAGE_KEY = 'ignis_contact_messages';
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -31,6 +29,7 @@ export default function Contact() {
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -46,46 +45,22 @@ export default function Contact() {
     }
   }, []);
 
-  const saveMessageToLocalStorage = (data) => {
-    try {
-      const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
-      const messages = raw ? JSON.parse(raw) : [];
-      
-      const newMessage = {
-        id: Date.now().toString(),
-        ...data,
-        status: 'new',
-        created_date: new Date().toISOString()
-      };
-      
-      messages.unshift(newMessage);
-      localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(messages));
-      
-      // Dispatch custom event to notify admin panel
-      window.dispatchEvent(new Event('ignis-messages-updated'));
-      
-      return true;
-    } catch (err) {
-      console.error('Error saving message to localStorage:', err);
-      return false;
-    }
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
+    setError(null);
     
     const messageData = {
       ...formData,
-      guests_count: formData.guests_count ? parseInt(formData.guests_count) : null
+      guests_count: formData.guests_count ? parseInt(formData.guests_count) : null,
+      status: 'new',
+      created_date: new Date().toISOString()
     };
     
-    // Save to localStorage
-    const success = saveMessageToLocalStorage(messageData);
-    
-    setIsSaving(false);
-    
-    if (success) {
+    try {
+      // Save to Base44 (global storage)
+      await base44.entities.ContactMessage.create(messageData);
+      
       setIsSubmitted(true);
       setFormData({
         name: '',
@@ -96,6 +71,11 @@ export default function Contact() {
         guests_count: '',
         message: ''
       });
+    } catch (err) {
+      console.error('Error saving message to Base44:', err);
+      setError('Nie udało się wysłać wiadomości. Spróbuj ponownie później.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -378,6 +358,12 @@ export default function Contact() {
                         placeholder="Opowiedz nam o swoich planach i oczekiwaniach..."
                       />
                     </div>
+
+                    {error && (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                        {error}
+                      </div>
+                    )}
 
                     <GoldButton type="submit" className="w-full" disabled={isSaving}>
                       {isSaving ? (
